@@ -1,11 +1,12 @@
 'use strict';
-const MongoClient = require('mongodb').MongoClient;
+
 const Hapi = require('hapi');
 const config = require('./package.json')
 const Joi = require('joi');
 const Boom = require('boom');
 const isBase64 = require('is-base64')
 const RandomString = require('randomstring')
+const bcrypt = require('bcrypt-nodejs');
 require('dotenv').config()
 
 const launchServer = async function() {
@@ -25,25 +26,15 @@ const launchServer = async function() {
   const server=Hapi.server({
     host: 'localhost',
     port: 8000,
-    routes: { cors: true }
+    routes: { cors: true },
+    debug: {
+      log: ['error']
+    }
   });
   
   await server.register({
       plugin: require('hapi-mongodb'),
       options: dbOpts
-  });
-
-  server.route({
-    method:'GET',
-    path:'/info',
-    handler:function(request,h) {
-      var data = {
-        status: 'Success',
-        version: config.version,
-  
-      }
-      return data;
-    }
   });
   
   server.route({
@@ -60,9 +51,10 @@ const launchServer = async function() {
       const imageID = req.params.image
       const db = req.mongo.db
       const ObjectID = req.mongo.ObjectID
-      const collection = db.collection('images')
+      const img_collection = db.collection('images')
+      const user_collection = db.collection('users')
       try {
-        var result = await collection.findOne({url: imageID}, {_id: 0})
+        var result = await img_collection.findOne({url: imageID}, {_id: 0})
       } catch (err) {
         console.error(err)
         return Boom.internal('An internal error occured when trying to find an image with that ID.')
@@ -75,11 +67,16 @@ const launchServer = async function() {
         } else if (result.expires_at && result.expires_at < new Date()) {
           return Boom.resourceGone('This image has expired.')
         } else {
+          const user = await user_collection.findOne({_id: result.created_by})
+          if (user) {
+            result.username = user.username
+          }
           return result
         }
       } else {
         return Boom.notFound('There was no image found for this ID.')
       }
+      db.close()
     }
   })
 
@@ -89,9 +86,7 @@ const launchServer = async function() {
     async handler (req, h) {
       const img_data = req.payload.img_data
       const api_key = req.payload.api_key
-
       const db = req.mongo.db
-      const ObjectID = req.mongo.ObjectID
       const user_collection = db.collection("users")
       const img_collection = db.collection("images")
       try {
@@ -101,7 +96,8 @@ const launchServer = async function() {
       }
       
       if (!isBase64(img_data)) {
-        return Boom.badRequest('Invalid image data.')
+        console.log(img_data)
+        return Boom.badRequest('Invalid image data. - '+req.payload)
       } else if (!user_info) {
         return Boom.unauthorized("Invalid API key")
       } else if (!user_info.permissions.can_upload) {
@@ -120,8 +116,7 @@ const launchServer = async function() {
             uniquie_id_chosen = true
           }
         } while (!uniquie_id_chosen)
-        console.log("ID chosen")
-        img_collection.insert({
+        var new_img = {
           image_data: img_data,
           url: random_id,
           created_at: new Date(),
@@ -129,18 +124,44 @@ const launchServer = async function() {
           created_by: user_info._id,
           is_private: (req.payload.is_private ? req.payload.is_private : false),
           is_deleted: (req.payload.is_deleted ? req.payload.is_deleted : false)
-        }, function(err, doc) {
-          console.log("entered insert callback")
-          if (err) {
-            console.error(err)
+        }
+        var insert_result = await img_collection.insertOne(new_img,).then((res) => {
+          if (res.result.ok !== 1) {
+            console.error("Err", err)
             return Boom.internal("An internal error occured while trying to create the image.")
           } else {
-            console.log("created")
-            return doc
+            return new_img
           }
         })
-        return Boom.internal("The image creation did not return anything.")
+        return insert_result
       }
+    }
+  })
+
+  server.route({
+    method: 'POST',
+    path: '/authenticate',
+    async handler(req, h) {
+      const username = req.payload.username
+      const password = req.payload.password
+      const db = req.mongo.db
+      const user_collection = db.collection("users")
+      const user = await user_collection.findOne({username: username})
+      if (!user) {
+        return Boom.unauthorized("Incorrect username or password")
+      }
+      let isAuthenticated = bcrypt.compareSync(password, user.password_hash)
+      if (isAuthenticated) {
+        console.log(user.username, " logged in")
+        return {
+          username: user.username,
+          api_key: user.api_key,
+          premissions: user.permissions
+        }
+      } else {
+        return Boom.unauthorized("Incorrect username or password")
+      }
+      db.close()
     }
   })
 
