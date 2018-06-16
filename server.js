@@ -38,17 +38,12 @@ const launchServer = async function() {
   });
   
   server.route({
-    method: 'GET',
-    path: '/getImage/{image}',
-    options: {
-      validate: {
-        params: {
-          image: Joi.string().length(5).alphanum().lowercase()
-        }
-      }
-    },
+    method: 'POST',
+    path: '/getImage',
+
     async handler(req, h) {
-      const imageID = req.params.image
+      const imageID = req.payload.url
+      const api_key = req.payload.api_key
       const db = req.mongo.db
       const ObjectID = req.mongo.ObjectID
       const img_collection = db.collection('images')
@@ -61,7 +56,20 @@ const launchServer = async function() {
       }
       if (result) {
         if (result.is_private) {
-          return Boom.unauthorized('This image is private.')
+          if (api_key) {
+            const user = await user_collection.findOne({api_key: api_key})
+            if (!user) {
+              return Boom.unauthorized('This image is private.')
+            } else {
+              // We have credentials
+              if (user) {
+                result.username = user.username
+              }
+              return result
+            }
+          } else {
+            return Boom.unauthorized('This image is private.')
+          }
         } else if (result.is_deleted) {
           return Boom.resourceGone('This image is deleted.')
         } else if (result.expires_at && result.expires_at < new Date()) {
@@ -120,7 +128,7 @@ const launchServer = async function() {
           image_data: img_data,
           url: random_id,
           created_at: new Date(),
-          expires_at: (req.payload.expires_at ? req.payload.expires_at : null),
+          expires_at: (req.payload.expires_at ? new Date(req.payload.expires_at) : null),
           created_by: user_info._id,
           is_private: (req.payload.is_private ? req.payload.is_private : false),
           is_deleted: (req.payload.is_deleted ? req.payload.is_deleted : false)
