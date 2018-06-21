@@ -5,6 +5,7 @@ require("dotenv").config();
 const getImage = require('./routes/getImage')
 const uploadImage = require('./routes/uploadImage')
 const authenticate = require('./routes/authenticate')
+const newUser = require('./routes/newUser')
 
 const launchServer = async function() {
   const db_conn =
@@ -26,7 +27,7 @@ const launchServer = async function() {
   };
 
   const server = Hapi.server({
-    host: "localhost",
+    host: process.env.SERVER_HOST,
     port: process.env.SERVER_PORT,
     routes: {
       cors: true
@@ -42,6 +43,7 @@ const launchServer = async function() {
   server.route(getImage);
   server.route(uploadImage);
   server.route(authenticate);
+  server.route(newUser);
 
   await server.start();
   console.log(`Server started at ${server.info.uri}`);

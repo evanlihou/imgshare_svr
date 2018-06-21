@@ -1,13 +1,39 @@
 const Boom = require("boom")
 const isBase64 = require("is-base64")
 const RandomString = require("randomstring")
+const JoiDataUri = require("joi-dataURI")
+const Joi = require("joi").extend(JoiDataUri)
+const DataUri = require("datauri")
+
+function file_to_dataURI(img_file) {
+  var img_data = new DataUri()
+  img_data.format('.png', img_file)
+  return img_data.content
+}
 
 module.exports = {
   method: "POST",
-  path: "/uploadImage",
+  path: "/api/uploadImage",
+  options: {
+    validate: {
+      headers: Joi.object({
+        api_key: Joi.string().length(27).alphanum().optional()
+      }).options({allowUnknown: true}),
+      payload: Joi.object({
+        img_data: Joi.dataURI().base64(),
+        img_file: Joi.any() // Should be a file stream, no way in Joi API to validate
+      }).xor('img_data', 'img_file')
+    }
+  },
   async handler(req, h) {
-    const img_data = req.payload.img_data;
-    const api_key = req.payload.api_key;
+    let img_data = req.payload.img_data;
+    const img_file = req.payload.img_file;
+    console.log(img_file)
+    if (img_file) {
+      console.log("Running fn")
+      img_data = await file_to_dataURI(img_file)
+    }
+    const api_key = req.headers.api_key;
     const db = req.mongo.db;
     const user_collection = db.collection("users");
     const img_collection = db.collection("images");
@@ -22,7 +48,7 @@ module.exports = {
     }
 
     if (!isBase64(img_data)) {
-      return Boom.badRequest("Invalid image data. - " + req.payload);
+      return Boom.badRequest("Invalid image data.");
     } else if (!user_info) {
       return Boom.unauthorized("Invalid API key");
     } else if (!user_info.permissions.can_upload) {

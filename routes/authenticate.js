@@ -1,9 +1,18 @@
 const Boom = require("boom")
 const bcrypt = require("bcrypt-nodejs")
+const Joi = require("joi")
 
 module.exports = {
   method: "POST",
-  path: "/authenticate",
+  path: "/api/authenticate",
+  options: {
+    validate: {
+      payload: {
+        username: Joi.string().alphanum().required(),
+        password: Joi.string().required()
+      }
+    }
+  },
   async handler(req, h) {
     const username = req.payload.username;
     const password = req.payload.password;
@@ -14,16 +23,17 @@ module.exports = {
     });
     if (!user) {
       return Boom.unauthorized("Incorrect username or password");
-    }
-    let isAuthenticated = bcrypt.compareSync(password, user.password_hash);
-    if (isAuthenticated) {
-      return {
-        username: user.username,
-        api_key: user.api_key,
-        premissions: user.permissions
-      };
     } else {
-      return Boom.unauthorized("Incorrect username or password");
+      let isAuthenticated = bcrypt.compareSync(password, user.password_hash);
+      if (isAuthenticated) {
+        return {
+          username: user.username,
+          api_key: user.api_key,
+          premissions: user.permissions
+        };
+      } else {
+        return Boom.unauthorized("Incorrect username or password");
+      }
     }
     db.close();
   }
