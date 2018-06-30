@@ -10,7 +10,7 @@ module.exports = {
         imageID: Joi.string().length(5).alphanum().lowercase().required()
       },
       headers: Joi.object({
-        api_key: Joi.string().length(27).alphanum().optional()
+        api_key: Joi.string().alphanum().optional()
       }).options({allowUnknown: true})
     }
   },

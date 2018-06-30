@@ -23,6 +23,8 @@ module.exports = {
     });
     if (!user) {
       return Boom.unauthorized("Incorrect username or password");
+    } else if (!user.password_hash || !user.permissions) {
+      return Boom.badImplementation(`The following user's DB entry is not structured properly:${username}`)
     } else {
       let isAuthenticated = bcrypt.compareSync(password, user.password_hash);
       if (isAuthenticated) {

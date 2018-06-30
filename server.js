@@ -2,10 +2,10 @@ const Hapi = require("hapi");
 require("dotenv").config();
 
 // Route definitions
-const getImage = require('./routes/getImage')
-const uploadImage = require('./routes/uploadImage')
-const authenticate = require('./routes/authenticate')
-const newUser = require('./routes/newUser')
+const getImage = require("./routes/getImage");
+const uploadImage = require("./routes/uploadImage");
+const authenticate = require("./routes/authenticate");
+const newUser = require("./routes/newUser");
 
 const launchServer = async function() {
   const db_conn =
@@ -30,7 +30,9 @@ const launchServer = async function() {
     host: process.env.SERVER_HOST,
     port: process.env.SERVER_PORT,
     routes: {
-      cors: true
+      cors: {
+        additionalHeaders: ["api_key"]
+      }
     }
   });
 

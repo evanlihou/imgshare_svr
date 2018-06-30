@@ -15,22 +15,29 @@ module.exports = {
   method: "POST",
   path: "/api/uploadImage",
   options: {
+    payload: {
+      // NOTE: This is probably way too high, and likely would be stopped by Nginx before it got here in prod
+      // If you're running into issues with your payload being too big and you're using Data URIs, try converting into files
+      // If you're using PNGs, try switching to compressed JPEGs (notably with iPhone photos, they're huge)
+      maxBytes: 50*1024*1024
+    },
     validate: {
       headers: Joi.object({
-        api_key: Joi.string().length(27).alphanum().optional()
+        api_key: Joi.string().alphanum()
       }).options({allowUnknown: true}),
       payload: Joi.object({
-        img_data: Joi.dataURI().base64(),
-        img_file: Joi.any() // Should be a file stream, no way in Joi API to validate
-      }).xor('img_data', 'img_file')
-    }
+        is_private: Joi.any(),
+        expires_at: Joi.any(),
+        img_data: Joi.dataURI().optional(),
+        img_file: Joi.any().optional() // Should be a file stream, no way in Joi API to validate
+      }).options({allowUnknown: true})
+   }
   },
   async handler(req, h) {
     let img_data = req.payload.img_data;
     const img_file = req.payload.img_file;
     console.log(img_file)
     if (img_file) {
-      console.log("Running fn")
       img_data = await file_to_dataURI(img_file)
     }
     const api_key = req.headers.api_key;
@@ -47,7 +54,8 @@ module.exports = {
       );
     }
 
-    if (!isBase64(img_data)) {
+    
+    if (!img_file && !isBase64(img_data)) {
       return Boom.badRequest("Invalid image data.");
     } else if (!user_info) {
       return Boom.unauthorized("Invalid API key");
