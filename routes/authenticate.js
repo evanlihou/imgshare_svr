@@ -6,7 +6,7 @@ const User = require('../models/User');
 
 module.exports = {
     method: 'POST',
-    path: '/api/authenticate',
+    path: '/login',
     options: {
         validate: {
             payload: {
@@ -21,7 +21,7 @@ module.exports = {
 
         const username = req.payload.username;
         const password = req.payload.password;
-        const user = await Users.findOne({ username });
+        const user = await User.findOne({ username });
         if (!user) {
             return Boom.unauthorized('Incorrect username or password');
         }

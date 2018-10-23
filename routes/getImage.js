@@ -6,8 +6,9 @@ const User = require('../models/User');
 
 module.exports = {
     method: 'GET',
-    path: '/api/getImage/{imageID}',
+    path: '/image/{imageID}',
     options: {
+        tags: ['api', 'image'],
         validate: {
             params: {
                 imageID: Joi.string()
@@ -23,38 +24,55 @@ module.exports = {
             }).options({ allowUnknown: true })
         }
     },
-    async handler(req) {
+    async handler(req, h) {
 
         const imageID = req.params.imageID;
         const api_key = req.headers.api_key;
         try {
-            // Get image as a plain JS object so we can add in keys later
-            // TODO: This is hacky, fix
-            var image_result = await Image.findOne({url: imageID}, '-_id').lean();
-            console.log(image_result)
+            var image_result = await Image.aggregate([
+                {$match: {
+                    img_id: imageID
+                }},
+                {$lookup: {
+                    from: "users",
+                    localField: "created_by",
+                    foreignField: "_id",
+                    as: "user"
+                }},
+                {$project: {
+                    img_id: 1,
+                    created_at: 1,
+                    expires_at: 1,
+                    is_private: 1,
+                    is_deleted: 1,
+                    _id: 0,
+                    user: {
+                        name: 1,
+                        username: 1
+                    }
+                }},
+                {$unwind: '$user'},
+                {$addFields: {
+                    absolute_url: {$concat: [`${process.env.SERVER_URL}/file/`, "$img_id"]}
+                }}
+            ]);
         }
         catch (err) {
             return Boom.internal(
-                'An internal error occured when trying to find an image with that ID.'
+                'Internal error: Finding image with ID' + imageID
             );
         }
-        if (!image_result) {
+        if (image_result == false) {
             return Boom.notFound('There was no image found for this ID.');
         }
-        if (image_result.is_private) {
+        else if (image_result.is_private) {
             if (api_key) {
                 const req_user = await User.findOne({ api_key });
                 if (!req_user) {
                     return Boom.unauthorized('This image is private.');
                 }
-                // We have credentials
-                const img_user = await User.findById(image_result.created_by);
-                if (img_user) {
-                    image_result.username = img_user.username;
-                }
-                return image_result;
             }
-            return Boom.unauthorized('This image is private.');
+            else { return Boom.unauthorized('This image is private.'); }
         }
         else if (image_result.is_deleted) {
             return Boom.resourceGone('This image has been deleted.');
@@ -62,10 +80,6 @@ module.exports = {
         else if (image_result.expires_at && image_result.expires_at < new Date()) {
             return Boom.resourceGone('This image has expired.');
         }
-        const img_user = await User.findById(image_result.created_by);
-        if (img_user) {
-            image_result.username = img_user.username;
-        }
-        return image_result;
+        return image_result[0];
     } // End handler
 }; // End route

@@ -25,12 +25,16 @@
     "graphql": "^0.13.2",
     "hapi": "^17.5.1",
     "hapi-mongodb": "^7.1.0",
+    "hapi-swagger": "^9.1.1",
+    "image-data-uri": "^1.1.1",
+    "inert": "^5.1.0",
     "is-base64": "0.0.5",
     "joi": "^13.4.0",
     "joi-dataURI": "^1.0.0",
     "mongodb": "^3.0.10",
     "mongoose": "^5.2.1",
-    "randomstring": "^1.1.5"
+    "randomstring": "^1.1.5",
+    "vision": "^5.3.3"
   },
   "devDependencies": {
     "code": "^5.2.0",

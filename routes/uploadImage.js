@@ -4,27 +4,22 @@ const IsBase64 = require('is-base64');
 const RandomString = require('randomstring');
 const JoiDataUri = require('joi-dataURI');
 const Joi = require('joi').extend(JoiDataUri);
-const DataUri = require('datauri');
+const ImageDataUri = require('image-data-uri');
+
+const GetImage = require('./getImage');
 
 const User = require('../models/User');
 const Image = require('../models/Image');
 
-const file_to_dataURI = function (img_file) {
-
-    const img_data = new DataUri();
-    img_data.format('.png', img_file);
-    return img_data.content;
-};
-
 module.exports = {
     method: 'POST',
-    path: '/api/uploadImage',
+    path: '/image',
     options: {
         payload: {
-            // NOTE: This is probably way too high, and likely would be stopped by Nginx before it got here in prod
-            // If you're running into issues with your payload being too big and you're using Data URIs, try converting into files
-            // If you're using PNGs, try switching to compressed JPEGs (notably with iPhone photos, they're huge)
-            maxBytes: 50 * 1024 * 1024
+            // Mongo only supports files up to 16 MB, this allows for slightly
+            // larger payloads for other data
+            maxBytes: 17 * 1024 * 1024,
+            parse: true
         },
         validate: {
             headers: Joi.object({
@@ -34,17 +29,13 @@ module.exports = {
                 is_private: Joi.any(),
                 expires_at: Joi.any(),
                 img_data: Joi.dataURI().optional(),
-                img_file: Joi.any().optional() // Should be a file stream, no way in Joi API to validate
-            }).options({ allowUnknown: true })
+                img_file: Joi.binary().optional() // Should be a file stream, no way in Joi API to validate
+            }).xor('img_data', 'img_file').options({ allowUnknown: true })
         }
     },
     async handler(req, h) {
-
-        let img_data = req.payload.img_data;
+        const img_data = req.payload.img_data;
         const img_file = req.payload.img_file;
-        if (img_file) {
-            img_data = await file_to_dataURI(img_file);
-        }
         const api_key = req.headers.api_key;
 
         try {
@@ -84,8 +75,7 @@ module.exports = {
         while (!unique_id_chosen);
 
         const new_img = new Image({
-            image_data: img_data,
-            url: random_id,
+            img_id: random_id,
             created_at: new Date(),
             expires_at: req.payload.expires_at
                 ? new Date(req.payload.expires_at)
@@ -99,15 +89,30 @@ module.exports = {
                 : false
         });
 
+        if (img_data) {
+            const uri = ImageDataUri.decode(img_data)
+            new_img.image_file = uri.dataBuffer;
+        } else if (img_file) {
+            new_img.image_file = img_file
+        }
+
         const insert_result = await new_img.save().catch((err) => {
             console.error(err)
             return Boom.internal(err)
         })
 
         var insert_data = insert_result.toObject()
+        // Don't return these fields in the response
         delete insert_data._id
         delete insert_data.created_by
+
+        const response = {
+            img_id: insert_data.img_id,
+            created_at: insert_data.created_at
+        }
+
+        return GetImage.handler({params: {imageID: insert_data.img_id}, headers: req.headers}, h)
         
-        return insert_data
+        return response
     }
 };

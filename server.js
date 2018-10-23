@@ -8,13 +8,18 @@ const server = new Hapi.server({
     port: process.env.SERVER_PORT,
     routes: {
         cors: {
+            origin: ['http://localhost:3000', 'https://i.evanlihou.com'],
             additionalHeaders: ['api_key']
         }
     }
 });
 
 server
-    .register(Api)
+    .register(Api, {
+        routes: {
+            prefix: '/api'
+        }
+    })
     .then(() => {
 
         server.start();

@@ -7,13 +7,14 @@ const User = require('../models/User');
 
 module.exports = {
     method: 'POST',
-    path: '/api/newUser',
+    path: '/user',
     options: {
         validate: {
             headers: Joi.object({
                 api_key: Joi.string().alphanum()
             }).options({ allowUnknown: true }),
             payload: {
+                name: Joi.string().required(),
                 username: Joi.string().required(),
                 password: Joi.string().required(),
                 permissions: Joi.object().keys({
@@ -58,6 +59,7 @@ module.exports = {
 
         const salt = Bcrypt.genSaltSync(10);
         const new_user_info = new User({
+            name: req.payload.name,
             username: req.payload.username,
             password_hash: Bcrypt.hashSync(req.payload.password, salt),
             api_key: random_id,
@@ -69,13 +71,14 @@ module.exports = {
             }
         });
 
-        const db_responce = await new_user_info.save().catch((err) => {
+        const db_response = await new_user_info.save().catch((err) => {
             console.error(err)
             return Boom.internal(err)
         });
 
         var insert_data = db_response.toObject()
         delete insert_data._id
+
 
         return insert_data;
     }

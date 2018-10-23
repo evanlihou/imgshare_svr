@@ -2,16 +2,15 @@ const Mongoose = require('mongoose');
 const Schema = Mongoose.Schema
 
 const UserSchema = new Schema({
-    _id: Schema.Types.ObjectId,
+    name: String,
     username: String,
     password_hash: String,
     api_key: String,
-    created_at: Date,
     permissions: {
         is_admin: Boolean,
         can_upload: Boolean,
         can_delete_own: Boolean
     }
-});
+},  { _id: true, timestamps: true });
 
 module.exports = Mongoose.model('User', UserSchema);
