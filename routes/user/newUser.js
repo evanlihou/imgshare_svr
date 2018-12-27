@@ -3,11 +3,11 @@ const Joi = require('joi');
 const Boom = require('boom');
 const Bcrypt = require('bcrypt-nodejs');
 const RandomString = require('randomstring');
-const User = require('../models/User');
+const User = require('../../models/User');
 
 module.exports = {
     method: 'POST',
-    path: '/user',
+    path: '/',
     options: {
         validate: {
             headers: Joi.object({
@@ -26,19 +26,9 @@ module.exports = {
         }
     },
     async handler(req, h) {
-
-        const api_key = req.headers.api_key;
-        try {
-            var user_info = await User.findOne({ api_key });
-        }
-        catch (err) {
-            return Boom.internal(
-                'An internal error has occured while trying to pull user by API key.'
-            );
-        }
-
-        if (!user_info.permissions.is_admin) {
-            return Boom.unauthorized('You must be admin to create users.');
+        const req_user = req.auth.credentials;
+        if (!req_user.permissions.is_admin) {
+            return Boom.forbidden('You must be an admin to create users.');
         }
 
         let random_id = '';
@@ -54,8 +44,7 @@ module.exports = {
             if (!users_with_id) {
                 unique_id_chosen = true;
             }
-        }
-        while (!unique_id_chosen);
+        } while (!unique_id_chosen);
 
         const salt = Bcrypt.genSaltSync(10);
         const new_user_info = new User({
@@ -72,13 +61,12 @@ module.exports = {
         });
 
         const db_response = await new_user_info.save().catch((err) => {
-            console.error(err)
-            return Boom.internal(err)
+            console.error(err);
+            return Boom.internal(err);
         });
 
-        var insert_data = db_response.toObject()
-        delete insert_data._id
-
+        var insert_data = db_response.toObject();
+        delete insert_data._id;
 
         return insert_data;
     }

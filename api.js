@@ -1,20 +1,17 @@
 'use strict';
-const Inert = require('inert');
-const Vision = require('vision');
-const HapiSwagger = require('hapi-swagger');
 const Pack = require('./package');
 const Mongoose = require('mongoose');
+const Boom = require('boom');
 
-// Route definitions
-const GetImage = require('./routes/getImage');
-const UploadImage = require('./routes/uploadImage');
 const Authenticate = require('./routes/authenticate');
-const NewUser = require('./routes/newUser');
-const ServeImage = require('./routes/serveImage');
-const AllImages = require('./routes/allImages');
+
+// Models
+const Session = require('./models/Session');
+const User = require('./models/User');
 
 const api = {
-    register: async function (server, options) {
+    register: async function(server, options) {
+        // Set up Mongo
         const db_conn =
             'mongodb://' +
             process.env.MONGO_USERNAME +
@@ -33,53 +30,77 @@ const api = {
             decorate: true
         };
 
-
-        Mongoose.connect(db_conn, { useNewUrlParser: true })
-        Mongoose.connection.once('open', () => {
-            console.log('Successfully connected to database')
-        });
-        await server.register({
-            plugin: require('hapi-mongodb'),
-            options: dbOpts
-        }).catch((err) => {
-            throw 'Could not connect to database: ', err;
+        Mongoose.connect(
+            db_conn,
+            { useNewUrlParser: true }
+        ).catch((e) => {
+            console.error('Unable to connect to MongoDB server');
+            process.exit(1);
         });
 
-        const swaggerOptions = {
-            basePath: '/api/',
-            tags: [{name: 'image'}, {name: 'user'}],
-            info: {
-                    title: 'ImgShare API',
-                    version: Pack.version,
-                    contact: {
-                        name: "Evan Lihou",
-                        url: "https://evanlihou.com",
-                        email: "evan@evanlihou.com"
-                    },
-            },
-        };
-        
-        await server.register([
-            Inert,
-            Vision,
-            {
-                plugin: HapiSwagger,
-                options: swaggerOptions
+        await server
+            .register({
+                plugin: require('hapi-mongodb'),
+                options: dbOpts
+            })
+            .catch((err) => {
+                throw ('Could not connect to database: ', err);
+            });
+
+        // TODO: Tjos should go somewhere else, it's cluttering up the file
+        const validateToken = async function(decoded, request) {
+            if (!decoded) {
+                throw Boom.unauthorized(null, 'Unable to decode your session');
             }
-        ]);
+            if (!decoded.session_id) {
+                return { isValid: false };
+            }
+            const session = await Session.findById(decoded.session_id);
+            if (!session) {
+                return { isValid: false };
+            }
+            if (session.expires_at < new Date()) {
+                // Expired
+                return { isValid: false };
+            }
+            // Associated user exists in DB
+            const user = await User.findById(session.user);
+            if (!user) {
+                return { isValid: false };
+            }
+            // Update expiration of token
+            var expires_at_time = new Date();
+            expires_at_time.setMinutes(expires_at_time.getMinutes() + 30); // Expires in 30 min
+            session.expires_at = expires_at_time;
+            session.save();
+            return { isValid: true, credentials: user };
+        };
 
-        server.route(GetImage);
-        server.route(UploadImage);
+        await server.register(require('hapi-auth-jwt2'));
+        server.auth.strategy('jwt', 'jwt', {
+            key: process.env.TOKEN_KEY,
+            validate: validateToken,
+            verifyOptions: { algorithms: ['HS256'] }
+        });
+
+        server.auth.default('jwt');
+
+        // Set up routes
+        server.register(require('./routes/image/routes'), {
+            routes: { prefix: '/image' }
+        });
+        server.register(require('./routes/user/routes'), {
+            routes: { prefix: '/user' }
+        });
+
+        // Routes without prefixes
         server.route(Authenticate);
-        server.route(NewUser);
-        server.route(ServeImage);
-        server.route(AllImages);
 
+        // Tell the server we're all set
         server.expose('registered', true);
-
     },
     name: 'imgshare_svr',
-    version: '0.2.0'
+    version: Pack.version
 };
 
 module.exports = api;
