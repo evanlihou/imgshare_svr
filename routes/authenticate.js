@@ -10,15 +10,15 @@ module.exports = {
     method: 'POST',
     path: '/login',
     options: {
-        auth: false
-        // validate: {
-        //     payload: {
-        //         username: Joi.string()
-        //             .alphanum()
-        //             .required(),
-        //         password: Joi.string().required()
-        //     }
-        // }
+        auth: false,
+        validate: {
+            payload: {
+                username: Joi.string()
+                    .alphanum()
+                    .required(),
+                password: Joi.string().required()
+            }
+        }
     },
     async handler(req, h) {
         const username = req.payload.username;
@@ -50,7 +50,7 @@ module.exports = {
         }
         if (isAuthenticated) {
             var expires_at_time = new Date();
-            expires_at_time.setMinutes(expires_at_time.getMinutes() + 30); // Expires in 30 min
+            expires_at_time.setDate(expires_at_time.getDate() + 1); // Expires in 1 day (normally 24 hours)
             const newSession = new Session({
                 issued_at: new Date(),
                 expires_at: expires_at_time,

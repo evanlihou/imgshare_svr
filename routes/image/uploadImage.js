@@ -22,10 +22,9 @@ module.exports = {
             parse: true
         },
         validate: {
-            headers: Joi.object({
-                api_key: Joi.string().alphanum()
-            }).options({ allowUnknown: true }),
+            headers: Joi.object({}).options({ allowUnknown: true }),
             payload: Joi.object({
+                caption: Joi.string().optional(),
                 is_private: Joi.any(),
                 expires_at: Joi.any(),
                 img_data: Joi.dataURI().optional(),
@@ -41,6 +40,7 @@ module.exports = {
         const req_user = req.auth.credentials;
 
         if (!img_file && !IsBase64(img_data)) {
+            // TODO: check null buffer
             return Boom.badRequest('Invalid image data.');
         }
         if (!req_user.permissions.can_upload) {
@@ -65,13 +65,13 @@ module.exports = {
 
         const new_img = new Image({
             img_id: random_id,
-            created_at: new Date(),
             expires_at: req.payload.expires_at
                 ? new Date(req.payload.expires_at)
                 : null,
             created_by: req_user._id,
             is_private: req.payload.is_private ? req.payload.is_private : false,
-            is_deleted: req.payload.is_deleted ? req.payload.is_deleted : false
+            is_deleted: req.payload.is_deleted ? req.payload.is_deleted : false,
+            caption: req.payload.caption ? req.payload.caption : null
         });
 
         if (img_data) {
@@ -87,11 +87,6 @@ module.exports = {
                 'An error occured while trying to save the image.'
             );
         });
-
-        var insert_data = insert_result.toObject();
-        // Don't return these fields in the response
-        delete insert_data._id;
-        delete insert_data.created_by;
 
         return GetImage.handler(
             {

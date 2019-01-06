@@ -44,10 +44,12 @@ module.exports = {
                 {
                     $project: {
                         img_id: 1,
-                        created_at: 1,
+                        createdAt: 1,
+                        updatedAt: 1,
                         expires_at: 1,
                         is_private: 1,
                         is_deleted: 1,
+                        caption: 1,
                         _id: 0,
                         user: {
                             name: 1,

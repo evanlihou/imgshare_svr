@@ -2,6 +2,7 @@
 const Pack = require('./package');
 const Mongoose = require('mongoose');
 const Boom = require('boom');
+const Jwt = require('jsonwebtoken');
 
 const Authenticate = require('./routes/authenticate');
 
@@ -38,6 +39,10 @@ const api = {
             process.exit(1);
         });
 
+        await server.register(require('./jobs')).catch((err) => {
+            throw 'Error initializing jobs';
+        });
+
         await server
             .register({
                 plugin: require('hapi-mongodb'),
@@ -47,34 +52,25 @@ const api = {
                 throw ('Could not connect to database: ', err);
             });
 
-        // TODO: Tjos should go somewhere else, it's cluttering up the file
-        const validateToken = async function(decoded, request) {
-            if (!decoded) {
-                throw Boom.unauthorized(null, 'Unable to decode your session');
+        const validateToken = require('./helpers/validateToken');
+
+        // A very quick and dirty way to see if current auth is valid
+        // Used for clients to check whether reauth is required due to expired session
+        server.route({
+            method: 'GET',
+            path: '/check_auth',
+            async handler(req, h) {
+                console.log(req.headers);
+                const valid = (await validateToken(
+                    Jwt.decode(req.headers.authorization),
+                    req
+                )).isValid;
+                if (!valid) {
+                    return Boom.unauthorized();
+                }
+                return { valid: true };
             }
-            if (!decoded.session_id) {
-                return { isValid: false };
-            }
-            const session = await Session.findById(decoded.session_id);
-            if (!session) {
-                return { isValid: false };
-            }
-            if (session.expires_at < new Date()) {
-                // Expired
-                return { isValid: false };
-            }
-            // Associated user exists in DB
-            const user = await User.findById(session.user);
-            if (!user) {
-                return { isValid: false };
-            }
-            // Update expiration of token
-            var expires_at_time = new Date();
-            expires_at_time.setMinutes(expires_at_time.getMinutes() + 30); // Expires in 30 min
-            session.expires_at = expires_at_time;
-            session.save();
-            return { isValid: true, credentials: user };
-        };
+        });
 
         await server.register(require('hapi-auth-jwt2'));
         server.auth.strategy('jwt', 'jwt', {

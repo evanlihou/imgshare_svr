@@ -12,16 +12,11 @@ module.exports = {
             mode: 'optional' // Only required for private images
         },
         validate: {
-            headers: Joi.object({
-                api_key: Joi.string()
-                    .alphanum()
-                    .optional()
-            }).options({ allowUnknown: true })
+            headers: Joi.object({}).options({ allowUnknown: true })
         }
     },
     async handler(req, h) {
         const img_id = req.params.id;
-        // const api_key = req.headers.api_key;
         const req_user = req.auth.credentials;
         try {
             var img = await Image.findOne({ img_id });

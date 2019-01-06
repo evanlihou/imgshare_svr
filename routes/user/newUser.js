@@ -11,7 +11,7 @@ module.exports = {
     options: {
         validate: {
             headers: Joi.object({
-                api_key: Joi.string().alphanum()
+                authorization: Joi.string()
             }).options({ allowUnknown: true }),
             payload: {
                 name: Joi.string().required(),
@@ -35,7 +35,7 @@ module.exports = {
         let unique_id_chosen = false;
         do {
             random_id = RandomString.generate({
-                length: 32
+                length: 24
             });
             const users_with_id = await User.findOne({
                 api_key: random_id
@@ -52,7 +52,6 @@ module.exports = {
             username: req.payload.username,
             password_hash: Bcrypt.hashSync(req.payload.password, salt),
             api_key: random_id,
-            created_at: new Date(),
             permissions: {
                 is_admin: req.payload.permissions.is_admin,
                 can_upload: req.payload.permissions.can_upload,
@@ -66,7 +65,7 @@ module.exports = {
         });
 
         var insert_data = db_response.toObject();
-        delete insert_data._id;
+        delete insert_data.password_hash;
 
         return insert_data;
     }

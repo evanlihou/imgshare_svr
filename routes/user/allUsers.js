@@ -3,24 +3,6 @@ const Boom = require('boom');
 const Joi = require('joi');
 const User = require('../../models/User');
 
-const responseSchema = Joi.object({
-    count: Joi.number(),
-    prepared: Joi.date(),
-    users: Joi.array().items(
-        Joi.object({
-            created_at: Joi.date(),
-            expires_at: Joi.date().optional(),
-            created_by: Joi.string(),
-            is_private: Joi.boolean(),
-            is_deleted: Joi.boolean(),
-            img_id: Joi.string(),
-            user: Joi.object({
-                username: Joi.string()
-            })
-        })
-    )
-});
-
 module.exports = {
     method: 'GET',
     path: '/',
@@ -36,7 +18,6 @@ module.exports = {
                     )
             }).options({ allowUnknown: true })
         }
-        //response: {schema: responseSchema}
     },
     async handler(req) {
         const req_user = req.auth.credentials;
@@ -49,10 +30,13 @@ module.exports = {
             match = {};
         } else {
             match = {
-                deleted_at: null
+                deletedAt: null
             };
         }
-        const users = await User.find(match);
+        const users = await User.find(
+            match,
+            '_id permissions name username created_at updated_at deleted_at'
+        );
 
         const response = {
             count: users.length,
