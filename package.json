@@ -24,7 +24,7 @@
     "hapi-mongodb": "^7.1.0",
     "is-base64": "0.0.5",
     "joi": "^13.4.0",
-    "mongodb": "^3.0.10",
+    "mongodb": "^3.2.4",
     "randomstring": "^1.1.5"
   },
   "devDependencies": {
