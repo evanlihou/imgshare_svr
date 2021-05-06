@@ -19,7 +19,7 @@
   "homepage": "https://github.com/evanlihou/imgshare_svr#readme",
   "dependencies": {
     "bcrypt-nodejs": "0.0.3",
-    "dotenv": "^6.0.0",
+    "dotenv": "^9.0.0",
     "hapi": "^17.5.1",
     "hapi-mongodb": "^7.1.0",
     "is-base64": "1.0.0",
