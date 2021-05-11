@@ -25,7 +25,7 @@
     "is-base64": "1.0.0",
     "joi": "^13.4.0",
     "mongodb": "^3.3.3",
-    "randomstring": "^1.1.5"
+    "randomstring": "^1.2.1"
   },
   "devDependencies": {
     "nodemon": "^1.19.1"
