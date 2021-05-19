@@ -1,0 +1,18 @@
+version: 2
+updates:
+- package-ecosystem: npm
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+  reviewers:
+  - evanlihou
+  ignore:
+  - dependency-name: mongodb
+    versions:
+    - 3.6.3
+    - 3.6.4
+    - 3.6.5
+  - dependency-name: joi
+    versions:
+    - 17.3.0
